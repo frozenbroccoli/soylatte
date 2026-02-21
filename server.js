@@ -45,12 +45,22 @@ if (!fs.existsSync(DOCS_DIR)) {
 // Create HTTP server to share with WebSocket
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
+wss.on('connection', (ws) => {
+    console.log('Client connected');
+});
 
 // Watch for file changes
-chokidar.watch(DOCS_DIR).on('all', (event, filePath) => {
+chokidar.watch(DOCS_DIR, {
+    ignoreInitial: true,
+}).on('all', (event, filePath) => {
     // Reload on change, add (new file), or unlink (delete file)
-    if (event === 'change' || event === 'add' || event === 'unlink') {
-        // Normalize path to be relative to DOCS_DIR and convert backslashes to slashes for URL matching
+    if (
+        event === 'change' ||
+        event === 'add' ||
+        event === 'unlink' ||
+        event === 'addDir' ||
+        event === 'unlinkDir'
+    ) {        // Normalize path to be relative to DOCS_DIR and convert backslashes to slashes for URL matching
         const relativePath = path.relative(DOCS_DIR, filePath).split(path.sep).join('/');
         console.log(`File event ${event}: ${relativePath}`);
         
@@ -131,6 +141,25 @@ function generateHtml(content, title, currentPath) {
         .file-list li { padding: 8px 0; border-bottom: 1px solid #45475a; }
         .icon { margin-right: 20px; color: #f9e2af; }
         .nf-icon { font-family: 'CaskaydiaCove Nerd', monospace; font-size: 1.1em; }
+        .index-preview {
+            display: block;
+            max-height: 200px;
+            overflow: hidden;
+            position: relative;
+            margin-bottom: 20px;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .index-preview::after {
+            content: "";
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: linear-gradient(to bottom, rgba(30,30,46,0), rgba(30,30,46,1));
+        }
         hr { border: 0; border-top: 1px solid #6c7086; }
         h1, h2, h3, h4, h5, h6 { color: #cba6f7; }
     </style>
@@ -139,6 +168,7 @@ function generateHtml(content, title, currentPath) {
 <body>
     ${backButtonHtml}
     <div id="content">${content}</div>
+    <style> body { padding-top: 70px; }
     <script>
         // Initialize mermaid
         mermaid.initialize({ startOnLoad: false, theme: 'dark' });
@@ -157,69 +187,39 @@ function generateHtml(content, title, currentPath) {
         });
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const socket = new WebSocket(protocol + '//' + window.location.host);
-        
+        const socket = new WebSocket(protocol + '//' + location.hostname + ':' + location.port); 
+
         // This is the path of the file/directory being VIEWED
         const currentViewPath = "${currentPath}"; 
         
         socket.onmessage = function(event) {
+            console.log('RAW WS:', event.data);
+
             const data = JSON.parse(event.data);
-            if (data.type === 'update') {
-               console.log('Update received for:', data.path);
-               
-               // Reload logic:
-               // 1. If the changed file IS the current file we are viewing.
-               // 2. If we are viewing a directory, and the changed file is INSIDE that directory.
-               // 3. Special case for index files (e.g. if viewing 'folder/', and 'folder/index.md' changes)
-               
-               // Check exact match
-               if (data.path === currentViewPath) {
-                   console.log('Reloading: exact match');
-                   window.location.reload();
-                   return;
-               }
-               
-               // Check if we are viewing the directory that contains the changed file
-               // If currentViewPath is 'folder1', and data.path is 'folder1/file.md'
-               
-               if (currentViewPath === '') {
-                   // We are at root.
-                   // If a file in root changes (no slashes in path), reload.
-                   if (!data.path.includes('/')) {
-                       console.log('Reloading: root file changed');
-                       window.location.reload();
-                       return;
-                   }
-               } else {
-                   // We are in a subdirectory 'folder1'
-                   // If the changed file is IN this directory (direct child), reload.
-                   // data.path = 'folder1/file.md'
-                   // prefix = 'folder1/'
-                   const prefix = currentViewPath + '/';
-                   if (data.path.startsWith(prefix)) {
-                       // Check if it is a direct child (no more slashes after prefix)
-                       const remaining = data.path.substring(prefix.length);
-                       if (!remaining.includes('/')) {
-                           console.log('Reloading: directory content changed');
-                           window.location.reload();
-                           return;
-                       }
-                       
-                       // If index.md inside this folder changed, we might need to reload if we are serving index.md
-                       // But if we are legally just listing files, index.md change will trigger above logic anyway.
-                       // If we are serving rendered index.md, currentViewPath might not be the folder path but the file path?
-                       // Wait, in server.js:
-                       // if (stats.isDirectory()) { ... render index.md ... relativePathStr = ... relative(..., indexPath) }
-                       // So if index.md exists, currentViewPath IS 'folder1/index.md'.
-                       // Then the exact match logic handles it!
-                       
-                       // If we are listing files (no index.md), currentViewPath IS 'folder1'.
-                       // Then if a file is added/removed/changed, we reload.
-                   }
-               }
+            console.log('Parsed:', data);
+
+            const current = currentViewPath.replace(/\/$/, '');
+            console.log('Current view:', current);
+
+            if (data.type !== 'update') return;
+
+            if (data.path === current) {
+                console.log('Exact match reload');
+                window.location.reload();
+                return;
             }
-        };
-        
+
+            if (!current.includes('.md')) {
+                const prefix = current ? current + '/' : '';
+                console.log('Prefix:', prefix);
+
+                if (data.path.startsWith(prefix)) {
+                    console.log('Directory reload');
+                    window.location.reload();
+                }
+            }
+        };        
+
         socket.onopen = () => console.log('Connected to live reload');
         socket.onclose = () => console.log('Disconnected from live reload');
     </script>
@@ -265,30 +265,51 @@ app.get(/.*/, async (req, res) => {
     }
 
     if (stats.isDirectory()) {
-        // List directory
         const files = await fs.promises.readdir(filePath, { withFileTypes: true });
-        
-        let listHtml = `<h1>Index of ${requestPath}</h1><ul class="file-list">`;
-        
+
+        let indexPreview = '';
+        const indexPath = path.join(filePath, 'index.md');
+        const indexStats = await getStats(indexPath);
+
+        if (indexStats && indexStats.isFile()) {
+            const raw = await fs.promises.readFile(indexPath, 'utf8');
+            const firstLines = raw.split('\n').slice(0, 10).join('\n');
+            const relativeIndexPath = path
+                .relative(DOCS_DIR, indexPath)
+                .split(path.sep)
+                .join('/');
+
+            indexPreview = `
+                <a href="/${relativeIndexPath}" class="index-preview">
+                    ${marked(firstLines)}
+                </a>
+            `;
+        }
+
+        let listHtml = `${indexPreview}<h1>Index of ${requestPath}</h1><ul class="file-list">`;
+
         if (requestPath !== '/') {
-             listHtml += `<li><span class="icon nf-icon">\uf07b</span><a href="..">..</a></li>`;
+            listHtml += `<li><span class="icon nf-icon">\uf07b</span><a href="..">..</a></li>`;
         }
 
         for (const file of files) {
             const isDir = file.isDirectory();
-            // Only show directories and markdown files
             if (!isDir && !file.name.endsWith('.md')) continue;
-            
+
             const icon = isDir ? '\uf07b' : '\uf48a';
             const suffix = isDir ? '/' : '';
             const href = file.name + suffix;
-            
+
             listHtml += `<li><span class="icon nf-icon">${icon}</span><a href="${href}">${file.name}</a></li>`;
         }
+
         listHtml += '</ul>';
-        
-        // Return file list
-        const relativeDir = path.relative(DOCS_DIR, filePath).split(path.sep).join('/');
+
+        const relativeDir = path
+            .relative(DOCS_DIR, filePath)
+            .split(path.sep)
+            .join('/');
+
         return res.send(generateHtml(listHtml, `Index of ${requestPath}`, relativeDir));
     }
 
