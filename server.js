@@ -14,30 +14,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 app.use('/static', express.static(path.join(__dirname, 'public')));
 
-// Icons
-const ICONS = {
-  folder: `
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M3 7h5l2 3h11v9a2 2 0 0 1-2 2H3z"/>
-</svg>
-`,
-  markdown: `
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M4 4h16v16H4z"/>
-  <path d="M8 15V9l3 3 3-3v6"/>
-  <path d="M16 13l2 2 2-2"/>
-</svg>
-`,
-  back: `
-<svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M15 18l-6-6 6-6"/>
-</svg>
-`
-};
-
 // Argument parsing
 let portArg = 3000;
 let hostArg = '0.0.0.0';
@@ -118,7 +94,7 @@ function generateHtml(content, title, currentPath) {
     // Create the back button HTML
     const backButtonHtml = backLink 
         ? `<a href="${backLink}" style="position: fixed; top: 20px; left: 20px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: #313244; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 1000; transition: all 0.2s;">
-              ${ICONS.back}
+            <span class="nf-icon">\uf053</span>
             </a>
            <style>
              /* Add hover effect for the floating button */
@@ -154,6 +130,7 @@ function generateHtml(content, title, currentPath) {
         .file-list { list-style: none; padding: 0; }
         .file-list li { padding: 8px 0; border-bottom: 1px solid #45475a; }
         .icon { margin-right: 20px; color: #f9e2af; }
+        .nf-icon { font-family: 'CaskaydiaCove Nerd', monospace; font-size: 1.1em; }
         hr { border: 0; border-top: 1px solid #6c7086; }
         h1, h2, h3, h4, h5, h6 { color: #cba6f7; }
     </style>
@@ -294,7 +271,7 @@ app.get(/.*/, async (req, res) => {
         let listHtml = `<h1>Index of ${requestPath}</h1><ul class="file-list">`;
         
         if (requestPath !== '/') {
-             listHtml += `<li><span class="icon">📁</span><a href="..">..</a></li>`;
+             listHtml += `<li><span class="icon nf-icon">\uf07b</span><a href="..">..</a></li>`;
         }
 
         for (const file of files) {
@@ -302,11 +279,11 @@ app.get(/.*/, async (req, res) => {
             // Only show directories and markdown files
             if (!isDir && !file.name.endsWith('.md')) continue;
             
-            const icon = isDir ? ICONS.folder : ICONS.markdown;
+            const icon = isDir ? '\uf07b' : '\uf48a';
             const suffix = isDir ? '/' : '';
             const href = file.name + suffix;
             
-            listHtml += `<li><span class="icon">${icon}</span><a href="${href}">${file.name}</a></li>`;
+            listHtml += `<li><span class="icon nf-icon">${icon}</span><a href="${href}">${file.name}</a></li>`;
         }
         listHtml += '</ul>';
         
