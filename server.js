@@ -1,6 +1,7 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { marked } from 'marked';
 import chokidar from 'chokidar';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -8,6 +9,34 @@ import http from 'http';
 import mime from 'mime-types';
 
 const app = express();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+app.use('/static', express.static(path.join(__dirname, 'public')));
+
+// Icons
+const ICONS = {
+  folder: `
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3 7h5l2 3h11v9a2 2 0 0 1-2 2H3z"/>
+</svg>
+`,
+  markdown: `
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 4h16v16H4z"/>
+  <path d="M8 15V9l3 3 3-3v6"/>
+  <path d="M16 13l2 2 2-2"/>
+</svg>
+`,
+  back: `
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+     stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M15 18l-6-6 6-6"/>
+</svg>
+`
+};
 
 // Argument parsing
 let portArg = 3000;
@@ -88,7 +117,9 @@ function generateHtml(content, title, currentPath) {
     
     // Create the back button HTML
     const backButtonHtml = backLink 
-        ? `<a href="${backLink}" style="position: fixed; top: 20px; left: 20px; font-size: 1.2em; text-decoration: none; color: #9399b2; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: #313244; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 1000; transition: all 0.2s;">←</a>
+        ? `<a href="${backLink}" style="position: fixed; top: 20px; left: 20px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: #313244; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 1000; transition: all 0.2s;">
+              ${ICONS.back}
+            </a>
            <style>
              /* Add hover effect for the floating button */
              a[href^='/']:hover { transform: scale(1.1); color: #cdd6f4; background: #45475a; }
@@ -103,9 +134,14 @@ function generateHtml(content, title, currentPath) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${title}</title>
     <style>
-        @import url('https://www.nerdfonts.com/assets/css/webfont.css');
+        @font-face {
+            font-family: 'CaskaydiaCove Nerd';
+            src: url('/static/fonts/CaskaydiaCoveNerdFont-Regular.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
         
-        body { font-family: "FiraCode Nerd Font", "Fira Code", monospace, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; color: #cdd6f4; background-color: #1e1e2e; }
+        body { font-family: "CaskaydiaCove Nerd", monospace, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; color: #cdd6f4; background-color: #1e1e2e; }
         pre { background: #313244; padding: 15px; overflow-x: auto; border-radius: 4px; border: 1px solid #45475a; }
         code { background: #313244; padding: 2px 4px; border-radius: 2px; font-family: "FiraCode Nerd Font", "Fira Code", monospace; color: #f5c2e7; }
         img { max-width: 100%; }
@@ -266,7 +302,7 @@ app.get(/.*/, async (req, res) => {
             // Only show directories and markdown files
             if (!isDir && !file.name.endsWith('.md')) continue;
             
-            const icon = isDir ? '' : '';
+            const icon = isDir ? ICONS.folder : ICONS.markdown;
             const suffix = isDir ? '/' : '';
             const href = file.name + suffix;
             
