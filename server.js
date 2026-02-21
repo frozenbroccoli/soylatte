@@ -45,9 +45,6 @@ if (!fs.existsSync(DOCS_DIR)) {
 // Create HTTP server to share with WebSocket
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
-wss.on('connection', (ws) => {
-    console.log('Client connected');
-});
 
 // Watch for file changes
 chokidar.watch(DOCS_DIR, {
@@ -103,12 +100,16 @@ function generateHtml(content, title, currentPath) {
     
     // Create the back button HTML
     const backButtonHtml = backLink 
-        ? `<a href="${backLink}" style="position: fixed; top: 20px; left: 20px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: #313244; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 1000; transition: all 0.2s;">
+        ? `<a class="back-btn" href="${backLink}" style="position: fixed; top: 20px; left: 20px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; background: #313244; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 1000; transition: all 0.2s;">
             <span class="nf-icon">\uf053</span>
             </a>
            <style>
              /* Add hover effect for the floating button */
-             a[href^='/']:hover { transform: scale(1.1); color: #cdd6f4; background: #45475a; }
+            .back-btn:hover {
+                transform: scale(1.1);
+                color: #cdd6f4;
+                background: #45475a;
+            }
            </style>` 
         : '';
     
@@ -150,7 +151,6 @@ function generateHtml(content, title, currentPath) {
             text-decoration: none;
             color: inherit;
         }
-
         .index-preview::after {
             content: "";
             position: absolute;
@@ -160,6 +160,11 @@ function generateHtml(content, title, currentPath) {
             height: 60px;
             background: linear-gradient(to bottom, rgba(30,30,46,0), rgba(30,30,46,1));
         }
+        .back-btn,
+        .back-btn:hover {
+            text-decoration: none;
+        }
+
         hr { border: 0; border-top: 1px solid #6c7086; }
         h1, h2, h3, h4, h5, h6 { color: #cba6f7; }
     </style>
