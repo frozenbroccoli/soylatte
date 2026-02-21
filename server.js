@@ -323,16 +323,9 @@ app.get(/.*/, async (req, res) => {
             const relativePathStr = path.relative(DOCS_DIR, filePath).split(path.sep).join('/');
             return res.send(generateHtml(html, path.basename(filePath), relativePathStr));
         } else {
-             // Block non-markdown files unless they are assets (images)
-             // The user said "only markdown files should be served"
-             // But usually that means "don't list other files" which I did.
-             // If I need to be strict, I can check mime type.
-             // Let's allow images.
-             const mimeType = mime.lookup(filePath);
-             if (mimeType && mimeType.startsWith('image/')) {
-                 return res.sendFile(filePath);
-             }
-             return res.status(403).send('Only markdown files and images are served.');
+            const mimeType = mime.lookup(filePath) || 'application/octet-stream';
+            res.type(mimeType);
+            return res.sendFile(filePath);
         }
     }
 });
