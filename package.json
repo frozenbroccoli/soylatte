@@ -1,0 +1,22 @@
+{
+  "name": "markdown-server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "chokidar": "^5.0.0",
+    "express": "^5.2.1",
+    "glob": "^13.0.5",
+    "marked": "^4.3.0",
+    "mime-types": "^3.0.2",
+    "ws": "^8.19.0"
+  }
+}
