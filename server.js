@@ -168,7 +168,7 @@ function generateHtml(content, title, currentPath) {
 <body>
     ${backButtonHtml}
     <div id="content">${content}</div>
-    <style> body { padding-top: 70px; }
+    <style> body { padding-top: 70px; } </style>
     <script>
         // Initialize mermaid
         mermaid.initialize({ startOnLoad: false, theme: 'dark' });
@@ -193,32 +193,35 @@ function generateHtml(content, title, currentPath) {
         const currentViewPath = "${currentPath}"; 
         
         socket.onmessage = function(event) {
-            console.log('RAW WS:', event.data);
-
             const data = JSON.parse(event.data);
-            console.log('Parsed:', data);
-
-            const current = currentViewPath.replace(/\/$/, '');
-            console.log('Current view:', current);
-
             if (data.type !== 'update') return;
 
+            const current = currentViewPath;
+
+            // Exact file match
             if (data.path === current) {
-                console.log('Exact match reload');
                 window.location.reload();
                 return;
             }
 
-            if (!current.includes('.md')) {
-                const prefix = current ? current + '/' : '';
-                console.log('Prefix:', prefix);
-
-                if (data.path.startsWith(prefix)) {
-                    console.log('Directory reload');
-                    window.location.reload();
+            // Directory view
+            if (!current.endsWith('.md')) {
+                if (current === '') {
+                    // root directory
+                    if (!data.path.includes('/')) {
+                        window.location.reload();
+                    }
+                } else {
+                    const prefix = current + '/';
+                    if (data.path.startsWith(prefix)) {
+                        const remaining = data.path.slice(prefix.length);
+                        if (!remaining.includes('/')) {
+                            window.location.reload();
+                        }
+                    }
                 }
             }
-        };        
+        }; 
 
         socket.onopen = () => console.log('Connected to live reload');
         socket.onclose = () => console.log('Disconnected from live reload');
